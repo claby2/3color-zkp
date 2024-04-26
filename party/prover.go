@@ -1,4 +1,4 @@
-package main
+package party
 
 import (
 	"math"
@@ -24,15 +24,27 @@ func colorPermutation(colors []string) map[string]string {
 	return perm
 }
 
+// commitment represents a commitment to a color and a random value.
+type commitment struct {
+	color string
+	hash  [32]byte
+	r     int64
+}
+
+// OpenCommitment represents an open commitment to a color and a random value.
+func (c commitment) Open() OpenCommitment {
+	return OpenCommitment{Color: c.color, R: c.r}
+}
+
 // Prover represents a prover in the graph coloring protocol.
 type Prover struct {
 	graph       graph.Graph
 	coloring    map[int]string
-	commitments map[int]Commitment
+	commitments map[int]commitment
 }
 
-// newProver creates a new prover instance for the given graph.
-func newProver(g graph.Graph, coloring map[int]string) (Prover, error) {
+// NewProver creates a new prover instance for the given graph.
+func NewProver(g graph.Graph, coloring map[int]string) (Prover, error) {
 	p := Prover{graph: g}
 
 	vertices := p.graph.Vertices()
@@ -49,13 +61,13 @@ func newProver(g graph.Graph, coloring map[int]string) (Prover, error) {
 
 	permutation := colorPermutation(colors)
 
-	p.commitments = make(map[int]Commitment)
+	p.commitments = make(map[int]commitment)
 	for _, v := range vertices {
 		permColor := permutation[coloring[v]]
 
 		r := rand.Int63n(int64(math.Pow(2, Lambda)))
 		hash := commit(permColor, r)
-		c := Commitment{
+		c := commitment{
 			color: permColor,
 			hash:  hash, r: r,
 		}
@@ -64,7 +76,8 @@ func newProver(g graph.Graph, coloring map[int]string) (Prover, error) {
 	return p, nil
 }
 
-func (p *Prover) hashes() map[int][32]byte {
+// Hashes returns the hashes of the commitments.
+func (p *Prover) Hashes() map[int][32]byte {
 	hashes := make(map[int][32]byte)
 	for vertex, commitment := range p.commitments {
 		hashes[vertex] = commitment.hash
@@ -72,30 +85,9 @@ func (p *Prover) hashes() map[int][32]byte {
 	return hashes
 }
 
-// Commitment represents a commitment to a color and a random value.
-type Commitment struct {
-	color string
-	hash  [32]byte
-	r     int64
-}
-
-// OpenCommitment represents an open commitment to a color and a random value.
-type OpenCommitment struct {
-	color string
-	r     int64
-}
-
-// fromCommitment creates an open commitment from a commitment.
-func fromCommitment(c Commitment) OpenCommitment {
-	return OpenCommitment{
-		color: c.color,
-		r:     c.r,
-	}
-}
-
-// openCommitments returns the open commitments of the vertices connected by the given edge.
-func (p *Prover) openCommitments(a, b int) (oc1 OpenCommitment, oc2 OpenCommitment) {
-	oc1 = fromCommitment(p.commitments[a])
-	oc2 = fromCommitment(p.commitments[b])
+// Open returns the open commitments of the vertices connected by the given edge.
+func (p *Prover) Open(a, b int) (oc1 OpenCommitment, oc2 OpenCommitment) {
+	oc1 = p.commitments[a].Open()
+	oc2 = p.commitments[b].Open()
 	return oc1, oc2
 }

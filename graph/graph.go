@@ -51,35 +51,35 @@ func Parse(s string) (Graph, map[int]string, error) {
 
 // Graph represents a graph with vertices and edges.
 type Graph struct {
-	vertices map[int]struct{}
-	edges    map[int]map[int]struct{}
+	V map[int]struct{}         `json:"vertices"`
+	E map[int]map[int]struct{} `json:"edges"`
 }
 
 // New creates a new graph instance.
 func New() Graph {
 	return Graph{
-		vertices: map[int]struct{}{},
-		edges:    map[int]map[int]struct{}{},
+		V: map[int]struct{}{},
+		E: map[int]map[int]struct{}{},
 	}
 }
 
 // Verify ensures edges are bidirectional and all vertices mentioned in edges
 // are present in the graph.
 func (g *Graph) Verify() error {
-	for v1, v2s := range g.edges {
-		if _, ok := g.vertices[v1]; !ok {
+	for v1, v2s := range g.E {
+		if _, ok := g.V[v1]; !ok {
 			return ErrInvalidGraph
 		}
 
 		for v2 := range v2s {
-			if _, ok := g.edges[v2]; !ok {
+			if _, ok := g.E[v2]; !ok {
 				return ErrInvalidGraph
 			}
-			if _, ok := g.edges[v2][v1]; !ok {
+			if _, ok := g.E[v2][v1]; !ok {
 				return ErrInvalidGraph
 			}
 
-			if _, ok := g.vertices[v2]; !ok {
+			if _, ok := g.V[v2]; !ok {
 				return ErrInvalidGraph
 			}
 		}
@@ -89,43 +89,43 @@ func (g *Graph) Verify() error {
 
 // AddVertex adds a vertex to the graph.
 func (g *Graph) AddVertex(v int) {
-	g.vertices[v] = struct{}{}
+	g.V[v] = struct{}{}
 }
 
 // AddEdge adds an edge between two vertices to the graph.
 func (g *Graph) AddEdge(v1, v2 int) {
-	if _, ok := g.edges[v1]; !ok {
-		g.edges[v1] = map[int]struct{}{}
+	if _, ok := g.E[v1]; !ok {
+		g.E[v1] = map[int]struct{}{}
 	}
 
-	g.edges[v1][v2] = struct{}{}
+	g.E[v1][v2] = struct{}{}
 
-	if _, ok := g.edges[v2]; !ok {
-		g.edges[v2] = map[int]struct{}{}
+	if _, ok := g.E[v2]; !ok {
+		g.E[v2] = map[int]struct{}{}
 	}
 
-	g.edges[v2][v1] = struct{}{}
+	g.E[v2][v1] = struct{}{}
 }
 
 // HasVertex checks whether the graph contains a vertex.
 func (g *Graph) HasVertex(v int) bool {
-	_, ok := g.vertices[v]
+	_, ok := g.V[v]
 	return ok
 }
 
 // HasEdge checks whether the graph contains an edge between two vertices.
 func (g *Graph) HasEdge(v1, v2 int) bool {
-	if _, ok := g.edges[v1]; !ok {
+	if _, ok := g.E[v1]; !ok {
 		return false
 	}
-	_, ok := g.edges[v1][v2]
+	_, ok := g.E[v1][v2]
 	return ok
 }
 
 // Vertices returns all vertices of the graph.
 func (g *Graph) Vertices() []int {
-	vertices := make([]int, 0, len(g.vertices))
-	for v := range g.vertices {
+	vertices := make([]int, 0, len(g.V))
+	for v := range g.V {
 		vertices = append(vertices, v)
 	}
 	return vertices
@@ -133,8 +133,8 @@ func (g *Graph) Vertices() []int {
 
 // Edges returns all edges of the graph.
 func (g *Graph) Edges() [][2]int {
-	edges := make([][2]int, 0, len(g.edges))
-	for v1, v2s := range g.edges {
+	edges := make([][2]int, 0, len(g.E))
+	for v1, v2s := range g.E {
 		for v2 := range v2s {
 			edges = append(edges, [2]int{v1, v2})
 		}
