@@ -1,24 +1,67 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
-	"fmt"
-	"github.com/dominikbraun/graph"
 	"math"
 	"math/rand"
+
+	"github.com/dominikbraun/graph"
 )
 
-const Lambda = 128
-
+// Prover represents a prover in the graph coloring protocol.
 type Prover[K comparable, T any] struct {
-	graph graph.Graph[K, T]
+	graph       graph.Graph[K, T]
+	commitments map[K]Commitment
 }
 
-// produces vertices from graph from prover
+// newProver creates a new prover instance for the given graph.
+func newProver[K comparable, T any](g graph.Graph[K, T]) (Prover[K, T], error) {
+	p := Prover[K, T]{graph: g}
+
+	vertices, err := p.vertices()
+	if err != nil {
+		return p, err
+	}
+
+	colors, err := p.colors(vertices)
+	if err != nil {
+		return p, err
+	}
+	perm, err := p.colorPermutation(colors)
+
+	p.commitments = make(map[K]Commitment)
+	for _, v := range vertices {
+		_, properties, err := p.graph.VertexWithProperties(v)
+		if err != nil {
+			return Prover[K, T]{}, err
+		}
+		color := properties.Attributes["color"]
+
+		permColor := perm[color]
+		r := rand.Int63n(int64(math.Pow(2, Lambda)))
+		hash := commit(permColor, r)
+		c := Commitment{
+			color: permColor,
+			hash:  hash, r: r,
+		}
+		p.commitments[v] = c
+	}
+	return p, nil
+}
+
+func (p *Prover[K, T]) hashes() map[K][32]byte {
+	hashes := make(map[K][32]byte)
+	for vertex, commitment := range p.commitments {
+		hashes[vertex] = commitment.hash
+	}
+	return hashes
+}
+
+// vertices returns all vertices of the graph that are connected by an edge.
+// Note: this function does not return isolated vertices, but this is not
+// relevant for the protocol.
 func (p *Prover[K, T]) vertices() ([]K, error) {
 	edges, err := p.graph.Edges()
-	vertexSet := make(map[K]struct{}) //dictionary
+	vertexSet := make(map[K]struct{})
 	vertices := make([]K, 0, len(vertexSet))
 	if err != nil {
 		return vertices, err
@@ -34,6 +77,7 @@ func (p *Prover[K, T]) vertices() ([]K, error) {
 	return vertices, nil
 }
 
+// colors returns all colors of the vertices in the given slice.
 func (p *Prover[K, T]) colors(vertices []K) ([]string, error) {
 	colorSet := make(map[string]struct{})
 	for _, v := range vertices {
@@ -41,7 +85,7 @@ func (p *Prover[K, T]) colors(vertices []K) ([]string, error) {
 		if err != nil {
 			return []string{}, err
 		}
-		colorSet[properties.Attributes["color"]] = struct{}{} //Maps to nothing in Go
+		colorSet[properties.Attributes["color"]] = struct{}{}
 	}
 	colors := make([]string, 0, len(colorSet))
 	for color := range colorSet {
@@ -50,7 +94,9 @@ func (p *Prover[K, T]) colors(vertices []K) ([]string, error) {
 	return colors, nil
 }
 
-// random shuffle
+// colorPermutation returns a random permutation of the given colors.
+// The permutation is represented as a map where the key is the original
+// color and the value is the new color.
 func (p *Prover[K, T]) colorPermutation(colors []string) (map[string]string, error) {
 	shuffled := make([]string, len(colors))
 	copy(shuffled, colors)
@@ -65,59 +111,30 @@ func (p *Prover[K, T]) colorPermutation(colors []string) (map[string]string, err
 	return perm, nil
 }
 
+// Commitment represents a commitment to a color and a random value.
 type Commitment struct {
-	hash [32]byte
-	r    int64
+	color string
+	hash  [32]byte
+	r     int64
 }
 
-func (p *Prover[K, T]) commitments() ([]Commitment, error) {
-	vertices, err := p.vertices()
-	if err != nil {
-		return []Commitment{}, err
-	}
-
-	colors, err := p.colors(vertices)
-	if err != nil {
-		return []Commitment{}, err
-	}
-	perm, err := p.colorPermutation(colors)
-
-	//generates commitments
-
-	commitments := make([]Commitment, 0, len(vertices))
-
-	for _, v := range vertices {
-		_, properties, err := p.graph.VertexWithProperties(v)
-		if err != nil {
-			return []Commitment{}, err
-		}
-		color := properties.Attributes["color"]
-
-		permColor := perm[color]
-		r := rand.Int63n(int64(math.Pow(2, Lambda)))
-		rBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(rBytes, uint64(r))
-		hash := sha256.Sum256([]byte(permColor + string(rBytes)))
-		c := Commitment{hash: hash, r: r}
-		commitments = append(commitments, c)
-	}
-	return commitments, nil
+// OpenCommitment represents an open commitment to a color and a random value.
+type OpenCommitment struct {
+	color string
+	r     int64
 }
 
-func main() {
-	prover := Prover[int, int]{}
-	prover.graph = graph.New(graph.IntHash)
-	prover.graph.AddVertex(0, graph.VertexAttribute("color", "red"))
-	prover.graph.AddVertex(1, graph.VertexAttribute("color", "blue"))
-	prover.graph.AddVertex(2, graph.VertexAttribute("color", "green"))
+// fromCommitment creates an open commitment from a commitment.
+func fromCommitment(c Commitment) OpenCommitment {
+	return OpenCommitment{
+		color: c.color,
+		r:     c.r,
+	}
+}
 
-	prover.graph.AddEdge(0, 1)
-	prover.graph.AddEdge(1, 2)
-	prover.graph.AddEdge(2, 3)
-
-	x := 0
-	x = 5
-
-	fmt.Println(x)
-
+// openCommitments returns the open commitments of the vertices connected by the given edge.
+func (p *Prover[K, T]) openCommitments(e graph.Edge[K]) (oc1 OpenCommitment, oc2 OpenCommitment) {
+	oc1 = fromCommitment(p.commitments[e.Source])
+	oc2 = fromCommitment(p.commitments[e.Target])
+	return oc1, oc2
 }
