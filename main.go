@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 
-	"github.com/dominikbraun/graph"
+	"github.com/claby2/3color-zkp/graph"
 )
 
 // Lambda is the security parameter of the protocol.
@@ -19,29 +19,33 @@ func commit(color string, r int64) [32]byte {
 }
 
 func main() {
-	g := graph.New(graph.IntHash)
-	g.AddVertex(0, graph.VertexAttribute("color", "red"))
-	g.AddVertex(1, graph.VertexAttribute("color", "blue"))
-	g.AddVertex(2, graph.VertexAttribute("color", "green"))
+	g := graph.New()
+
+	g.AddVertex(0)
+	g.AddVertex(1)
+	g.AddVertex(2)
 
 	g.AddEdge(0, 1)
 	g.AddEdge(1, 2)
-	g.AddEdge(2, 3)
+	g.AddEdge(2, 0)
 
-	prover, err := newProver(g)
+	coloring := map[int]string{
+		0: "red",
+		1: "green",
+		2: "blue",
+	}
+
+	prover, err := newProver(g, coloring)
 	if err != nil {
 		panic(err)
 	}
 
 	verifier := newVerifier(g, prover.hashes())
 
-	edge, err := verifier.randomEdge()
-	if err != nil {
-		panic(err)
-	}
+	a, b := verifier.randomEdge()
 
-	oc1, oc2 := prover.openCommitments(edge)
-	if verifier.verify(edge, oc1, oc2) {
+	oc1, oc2 := prover.openCommitments(a, b)
+	if verifier.verify(a, b, oc1, oc2) {
 		println("✅ Edge is valid.")
 	} else {
 		println("❌ Edge is invalid.")
