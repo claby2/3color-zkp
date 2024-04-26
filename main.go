@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"os"
+	"strconv"
 
 	"github.com/claby2/3color-zkp/graph"
 )
@@ -19,20 +21,28 @@ func commit(color string, r int64) [32]byte {
 }
 
 func main() {
-	g := graph.New()
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		println("Usage: ./3color-zkp <graph> [repetitions]")
+		os.Exit(1)
+	}
 
-	g.AddVertex(0)
-	g.AddVertex(1)
-	g.AddVertex(2)
+	graphFile := os.Args[1]
+	graphData, err := os.ReadFile(graphFile)
+	if err != nil {
+		panic(err)
+	}
 
-	g.AddEdge(0, 1)
-	g.AddEdge(1, 2)
-	g.AddEdge(2, 0)
+	repetitions := 1
+	if len(os.Args) == 3 {
+		repetitions, err = strconv.Atoi(os.Args[2])
+		if err != nil {
+			panic(err)
+		}
+	}
 
-	coloring := map[int]string{
-		0: "red",
-		1: "green",
-		2: "blue",
+	g, coloring, err := graph.Parse(string(graphData))
+	if err != nil {
+		panic(err)
 	}
 
 	prover, err := newProver(g, coloring)
@@ -42,12 +52,19 @@ func main() {
 
 	verifier := newVerifier(g, prover.hashes())
 
-	a, b := verifier.randomEdge()
+	failed := 0
+	for i := 0; i < repetitions; i++ {
+		a, b := verifier.randomEdge()
 
-	oc1, oc2 := prover.openCommitments(a, b)
-	if verifier.verify(a, b, oc1, oc2) {
-		println("✅ Edge is valid.")
-	} else {
-		println("❌ Edge is invalid.")
+		oc1, oc2 := prover.openCommitments(a, b)
+		if !verifier.verify(a, b, oc1, oc2) {
+			failed++
+		}
 	}
+	if failed == 0 {
+		print("✅ ")
+	} else {
+		print("❌ ")
+	}
+	println("Summary:", failed, "failed out of", repetitions)
 }
