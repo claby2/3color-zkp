@@ -24,9 +24,15 @@ func (v *Verifier) RandomEdge() (int, int) {
 	return edge[0], edge[1]
 }
 
+func acceptableColor(color string) bool {
+	return color == "red" || color == "green" || color == "blue"
+}
+
 // Verify checks whether the given edge and its open commitments are valid.
 func (v *Verifier) Verify(a, b int, oc1 OpenCommitment, oc2 OpenCommitment) bool {
 	return v.hashes[a] == commit(oc1.Color, oc1.R) &&
 		v.hashes[b] == commit(oc2.Color, oc2.R) &&
-		oc1.Color != oc2.Color
+		oc1.Color != oc2.Color &&
+		acceptableColor(oc1.Color) &&
+		acceptableColor(oc2.Color)
 }
