@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 )
 
-const Lambda = 128
+const Lambda = 32
 
 // commit creates a commitment for the given color and randomness.
 func commit(color string, r int64) [32]byte {
