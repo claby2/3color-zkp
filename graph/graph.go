@@ -78,7 +78,6 @@ func (g *Graph) Verify() error {
 			if _, ok := g.E[v2][v1]; !ok {
 				return ErrInvalidGraph
 			}
-
 			if _, ok := g.V[v2]; !ok {
 				return ErrInvalidGraph
 			}

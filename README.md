@@ -3,15 +3,15 @@
 
 ## Description:
 Contains:
-- A server/verifier that verifies a given graph from the client/prover. 
-- A graph directory which contains example graphs to play with. For example, the following texts will represent a graph with 3 vertices, 2 of which are red, 1 is green:
-0 red
-1 red
-2 green
+* A server/verifier that verifies a given graph from the client/prover. 
+* A graph directory which contains example graphs to play with. For example, the following texts will represent a graph with 3 vertices, 2 of which are red, 1 is green:
+    * 0 red
+    * 1 red
+    * 2 green
 
-0 1
-1 2
-2 0
+    * 0 1
+    * 1 2
+    * 2 0
 - The text files will then be parsed into a graph, which is given to the prover to be sent to the verifier. 
 - Networking between the prover and the verifier.
 - A 3Color-ZKP implementation between the prover and the verifier: the prover commits to a graph coloring, sends to verifier. Verifier chooses two random adjacent vertices, checks color of the two vertices. Prover then shuffle the colors so the verifier can't learn anything from the previous rounds. This shuffling happens every iteration. 
